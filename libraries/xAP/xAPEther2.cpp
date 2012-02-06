@@ -91,9 +91,7 @@ void XapEther2::sendHeartbeat(void) {
   // then create the PACKET datagram around it and transmit.
   bfill = udpOffset(xapbuf);
 #ifdef XAP_VERSION_1.3
-  bfill.emit_p(PSTR("xap-hbeat\n{\nv=13\nhop=1\nuid=$S\nsource=$S\ninterval=$D\nport=3639\nclass=xap-hbeat.alive\n}"
-  "\nheartbeat\n{\nuptime=$D\n}\n"
-  ), UID, SOURCE, XAP_HEARTBEAT/1000, *UPTIME);
+  bfill.emit_p(PSTR("xap-hbeat\n{\nv=13\nhop=1\nuid=$S\nsource=$S\ninterval=$D\nport=3639\nclass=xap-hbeat.alive\n}\nheartbeat\n{\nuptime=$D\n}\n"), UID, SOURCE, (int)(XAP_HEARTBEAT/1000), *UPTIME);
 #else
   bfill.emit_p(PSTR("xap-hbeat\n{\nv=12\nhop=1\nuid=$S\nsource=$S\ninterval=$D\nport=3639\nclass=xap-hbeat.alive\n}"
   ), UID, SOURCE, XAP_HEARTBEAT/1000);
