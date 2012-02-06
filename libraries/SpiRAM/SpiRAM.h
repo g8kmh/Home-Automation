@@ -47,8 +47,8 @@
 #define WRITE 2
 
 // SRAM Hold line override
-//#define HOLD 1
-#define HOLD 0
+#define HOLD 1
+//#define HOLD 0
 // SRAM modes
 #define BYTE_MODE (0x00 | HOLD)
 //#define PAGE_MODE (0x80 | HOLD)

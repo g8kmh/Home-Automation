@@ -30,16 +30,20 @@
 */
 
 
-#define DEBUG_THIS
+//#define DEBUG_THIS
 
 #ifdef DEBUG_THIS
-	#define BSCTEMP_VERSION "0.946D"
+	#define BSCTEMP_VERSION "0.947D"
 #else
-	#define BSCTEMP_VERSION "0.946"
+	#define BSCTEMP_VERSION "0.947"
 #endif
 #define USE_DHCP
 #define USE_FRAM
-#define HRS24 1440
+#ifdef DEBUG_THIS
+	#define HRS24 60
+#else
+	#define HRS24 1440
+#endif
 #define NANODE
 
 #include <EtherShield.h>
@@ -55,19 +59,10 @@
 #include <SPI.h>
 
 #ifdef USE_FRAM
-// YMMV - change if using another form of RAM/FRAM/EEPROM
+// YMMV - change if using another form of EEPROM. Good for SRAM and FRAM. Check HOLD =1 is set in SpiRAM.h
 #include <SpiRAM.h>
 #endif
 #include <avr/pgmspace.h>
-
-// Avoid spurious pgmspace warnings - http://forum.jeelabs.net/node/327
-// See also http://gcc.gnu.org/bugzilla/show_bug.cgi?id=34734
-/*
-#undef PROGMEM
-#define PROGMEM __attribute__(( section(".progmem.data") ))
-#undef PSTR
-#define PSTR(s) (__extension__({static prog_char c[] PROGMEM = (s); &c[0];}))
-*/
 
 PROGMEM prog_char xaplogo[] ={
 0x42, 0x4D, 0x96, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x76, 0x00, 0x00, 0x00, 0x28, 0x00,
@@ -471,7 +466,7 @@ Configure xap object
   TIMSK2 |= (1<<TOIE2);  
 //  Serial.println(freeRam());
 #ifdef DEBUG_THIS
-			sprintf(DEBUG_THIS_MESSAGE, "%s %d", "STARTUP", freeRam());
+			sprintf(DEBUG_THIS_MESSAGE, "%s %d", "START", freeRam());
 //			Serial.println(F("S"));
 #endif
 
@@ -490,7 +485,7 @@ ISR(TIMER2_OVF_vect) {
   		sensors.requestTemperatures(); // Send the command to get temperatures (here not loop)
 		semaphore |= UPDATETEMPERATURES; // and in the loop
   }
-  if (tmx >= 5900) // every minute 'ish (6000 shows some creep over days)
+  if (tmx >= (XAP_HEARTBEAT-1000)/10) // every minute 'ish (60000 shows some creep over days)
   { 
 	xap.sendHeartbeat();
 #ifdef DEBUG_THIS
@@ -521,7 +516,7 @@ void printIP( uint8_t *buf ) {
 
 static void sendInfo() {
 #ifdef DEBUG_THIS
-			sprintf(DEBUG_THIS_MESSAGE, "%s %d", "INFO", freeRam());
+			sprintf(DEBUG_THIS_MESSAGE, "%s %d", "INF", freeRam());
 //			Serial.println(F("I"));
 #endif
 #ifdef USE_FRAM
@@ -540,6 +535,10 @@ static void sendInfo() {
 	      
 }
 static void sendInfo(int i) {
+#ifdef DEBUG_THIS
+			sprintf(DEBUG_THIS_MESSAGE, "%s %d", "INF", freeRam());
+//			Serial.println(F("I"));
+#endif
 	
 #ifdef USE_FRAM
 	   readSensorfromFRAM(&sensor, i);
@@ -559,7 +558,6 @@ static void OK200Page() {
   bfill.emit_p(PSTR(
   "HTTP/1.0 200 OK\r\n"
     "Content-Type: text/html\r\n"
-    "Pragma: no-cache\r\n"
     "\r\n"
     "<html><title>xAP BSCTEMP</title>"
 	"<body style=\"background:#A9F5F2\">"
@@ -576,12 +574,11 @@ static void failedPage() {
   bfill.emit_p(PSTR(
   "HTTP/1.0 200 OK\r\n"
     "Content-Type: text/html\r\n"
-    "Pragma: no-cache\r\n"
     "\r\n"
     "<html><title>xAP BSCTEMP</title>"
 	"<body style=\"background:#A9F5F2\">"
     "<img src=\"xaplogo.bmp\" >"
-    "<H1>Action Failed</H1>"
+    "<H1>Failed</H1>"
 	"<A HREF=\"/\">Home</A><P>"
 	"</body></html>"
 	));
@@ -612,7 +609,7 @@ static void configPage() {
   "<html><head><title>xAP Configuration</title></head>"
   "<body style=\"background:#A9F5F2\">"
   "<img src=\"xaplogo.bmp\" >"
-  "<h3>xAP Configuration</h3><hr/>"
+  "<h3>xAP Config</h3><hr/>"
   "<form METHOD=\"POST\" action=\"/c\">"
   "Source Instance "
   "<input type=\"text\" name=\"source\" size=\"16\" maxlength=\"16\"/><BR />"
@@ -625,7 +622,7 @@ static void configPage() {
 #endif
   "xAP BSC Delta Temp value:"
   "<input type=\"text\" name=\"delta\" size=\"5\" maxlength=\"5\"/><BR />"
-  "This is the amount the temperature has to change to generate a BSCEvent<BR />"
+  "Amount temperature has to change to generate a BSCEvent<BR />"
   "<input type=\"submit\" value=\"Go\"/>"
   "</form><hr/></body></html>"
 	));
@@ -648,7 +645,7 @@ static void configSubs() {
   "<input type=\"text\" name=\"name\" size=\"16\" maxlength=\"16\"/><BR />"
   "xAP BSC Setpoint value:"
   "<input type=\"text\" name=\"set\" size=\"5\" maxlength=\"5\"/><BR />"
-  "This is the value used to determine state on/off in BSC message<BR />"
+  "Value used to determine state on/off<BR />"
   "<input type=\"submit\" value=\"Go\"/>"
   "</form><hr/></body></html>"
 	));
@@ -685,13 +682,18 @@ readSensorfromFRAM(&sensor_temp, 0);
 	"Version $S<P>"
 	"<H2>UID $S</H2>"
 	"<H2>Source $S</H2>"
-	"$D devices attached<P>"
-	"First Sensor Temperature $S&deg;C<p>"
+	"$D devices<P>"
+	"1st Sensor Temp $S&deg;C<p>"
 	"xAP Delta $S&deg;C<p>"
-	"Uptime $D Days<p>"
+	
+#ifdef DEBUG_THIS
+	"Uptime $D H<p>"
+#else
+	"Uptime $D D<p>"
+#endif
 #ifdef USE_FRAM
-	"<A HREF=\"/c\">Config xAP</A><P>"
-	"<A HREF=\"/s\">Config SubAddress</A>"
+	"<A HREF=\"/c\">Cfg xAP</A><P>"
+	"<A HREF=\"/s\">Cfg SubAddress</A>"
 #endif
 	"</body></html>"
 	), BSCTEMP_VERSION,
@@ -710,12 +712,12 @@ readSensorfromFRAM(&sensor_temp, 0);
     "\r\n"
     "<html><title>xAP BSCTEMP</title>"
     "<H1>UID $S</H1>"
-	"$D devices attached<P>"
-	"First Sensor Temperature $S&deg;C<p>"
-	"Uptime $D Days<P>"
+	"$D devices<P>"
+	"1st Sensor Temp$S&deg;C<p>"
+	"Uptime $D D<P>"
 #ifdef USE_FRAM
-	"<A HREF=\"/c\">Config xAP</A><P>"
-	"<A HREF=\"/s\">Config SubAddress</A><P>"
+	"<A HREF=\"/c\">Cfg xAP</A><P>"
+	"<A HREF=\"/s\">Cfg SubAddress</A><P>"
 
 #endif
 	"</body></html>"
