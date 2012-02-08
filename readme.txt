@@ -1,3 +1,6 @@
+Release 0.950 changelist
+Conversion to Ethercard
+----------------------------------------------------------
 README.TXT 0.947
 First Github release
 

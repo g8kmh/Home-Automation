@@ -56,7 +56,10 @@ class XapEther2 : public XapClass {
   uint8_t* tcpOffset(uint8_t* buf);
 
 };
-
+#ifdef EtherCard_h
+extern EtherCard ether;
+#else
 extern EtherShield es;
+#endif
 extern BufferFiller bfill;
 #endif

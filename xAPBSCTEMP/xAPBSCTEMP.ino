@@ -4,6 +4,8 @@
 
   Requires Arduino IDE 1.0 or up
   
+  THIS VERSION FOR ETHERCARD LIBRARY
+  
  Arduino 
   GND   ------1+--------\
    A3    ------2+ ds1820 | 
@@ -30,12 +32,12 @@
 */
 
 
-//#define DEBUG_THIS
+#define DEBUG_THIS
 
 #ifdef DEBUG_THIS
-	#define BSCTEMP_VERSION "0.947D"
+	#define BSCTEMP_VERSION "0.950D"
 #else
-	#define BSCTEMP_VERSION "0.947"
+	#define BSCTEMP_VERSION "0.950"
 #endif
 #define USE_DHCP
 #define USE_FRAM
@@ -46,24 +48,24 @@
 #endif
 #define NANODE
 
-#include <EtherShield.h>
+#include <EtherCard.h>
 #ifdef NANODE
 #include <NanodeMAC.h>
 #endif
-#include <BufferFiller.h>
 #include <xAP.h>
 #include <xAPEther2.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
-//#include <stdlib.h>
 #include <SPI.h>
-
 #ifdef USE_FRAM
 // YMMV - change if using another form of EEPROM. Good for SRAM and FRAM. Check HOLD =1 is set in SpiRAM.h
 #include <SpiRAM.h>
 #endif
-#include <avr/pgmspace.h>
+//#include <avr/pgmspace.h>
 
+/**********************************************************
+			xAP LOGO
+**********************************************************/
 PROGMEM prog_char xaplogo[] ={
 0x42, 0x4D, 0x96, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x76, 0x00, 0x00, 0x00, 0x28, 0x00,
 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x22, 0x00, 0x00, 0x00, 0x01, 0x00, 0x04, 0x00, 0x00, 0x00,
@@ -115,8 +117,8 @@ static uint8_t mymac[6] = { 0,0,0,0,0,0 };
 #else
 static uint8_t mymac[6] = { 0x54,0x55,0x58,0x12,0x34,0x56 }; // CHANGE THIS FOR YOUR NETWORK MAC ADDRESS - MUST BE UNIQUE PER DEVICE
 #endif
-static uint8_t myip[4] = { 0,0,0,0 };
-static uint8_t mynetmask[4] = { 0,0,0,0 };
+static uint8_t myip[4] = { 192,168,0,55 };
+static uint8_t mynetmask[4] = { 255,255,255,0 };
 
 // IP address of the host being queried to contact (IP of the first portion of the URL):
 //static uint8_t websrvip[4] = { 0, 0, 0, 0 };
@@ -124,7 +126,7 @@ static uint8_t mynetmask[4] = { 0,0,0,0 };
 // Default gateway. The ip address of your DSL router. It can be set to the same as
 // websrvip the case where there is no default GW to access the 
 // web server (=web server is on the same lan as this host) 
-static uint8_t gwip[4] = { 0,0,0,0};
+static uint8_t gwip[4] = { 192,168,0,1};
 
 static uint8_t dnsip[4] = { 0,0,0,0 };
 static uint8_t dhcpsvrip[4] = { 0,0,0,0 };
@@ -213,7 +215,9 @@ int tmx;
 Main packet buffer - as big as possible
 ************************************************************/
 #define BUFFER_SIZE 810
-static uint8_t buf[BUFFER_SIZE+1];
+byte Ethernet::buffer[BUFFER_SIZE+1];
+
+//static uint8_t buf[BUFFER_SIZE+1];
 
 //byte *xapbuf;
 //word xapbuflen;
@@ -221,7 +225,7 @@ static uint8_t buf[BUFFER_SIZE+1];
 #ifdef NANODE
 NanodeMAC mac( mymac ); // Go get the MAC from the chip
 #endif
-EtherShield es=EtherShield();
+//EtherShield es=EtherShield();
 BufferFiller bfill;
 XapEther2 xap;
 //XapEther2 xap(SOURCE, UID);
@@ -303,22 +307,31 @@ void setup () {
 		Serial.print( i < 5 ? ":" : "" );
 	}
   Serial.println();
-  es.ES_enc28j60SpiInit();
-  es.ES_enc28j60Init(mymac, ENET_PIN);
-   if( es.ES_enc28j60Revision() <= 0 ) {
+
+if (ether.begin(sizeof Ethernet::buffer, mymac) == 0) {
 		Serial.println(F("ERR:ENC28J60"));			
-		while(1);    // Just loop here
-  }
-  
-  if( es.allocateIPAddress(buf, BUFFER_SIZE, mymac, 80, myip, mynetmask, gwip, dhcpsvrip, dnsip ) > 0 ) {
-	// Display the results:
+while(1);
+}
+
+#ifdef USE_DHCP
+
+	if (!ether.dhcpSetup()) {
+		Serial.println(F("ERR:DHCP"));
+	while(1);
+	}
+#else
+	ether.staticSetup(myip, gwip);
+#endif
     Serial.print( F("My IP: " ));
-    printIP( myip );
+    printIP( EtherCard::myip );
     Serial.println(); 
-  } else {
-    Serial.println(F("ERR:DHCP"));
-  }
-// ram test
+	delay(1500); // Let ARP's etc settle
+// Set promiscuous mode or Broadcast on the Ethernet chip YMMV
+//    ether.enablePromiscuous ();
+    ether.enableBroadcast ();
+/*********************************************************
+			RAM (FRAM/SRAM) TEST
+**********************************************************/
 #ifdef USE_FRAM
 	for (byte i = 0; i< 4; i++){
 	read_eeprom = SpiRam.read_byte(i);
@@ -363,11 +376,6 @@ void setup () {
 		makeXapDefaults();
 	
 #endif  // FRAM
-/******************************************************************************
-   init the ethernet/ip layer:
-******************************************************************************/
-
-  es.ES_init_ip_arp_udp_tcp(mymac,myip, MYWWWPORT);
 
 /******************************************************************************
 One Wire Init Code
@@ -415,8 +423,9 @@ Configure xap object
 
 	xap.setUID(base_UID);
 	xap.setUPTIME(&uptimeDays);
-    xap.setBuffer(buf, sizeof buf);
-
+	/****
+    xap.setBuffer(Ethernet::buffer, sizeof Ethernet::buffer);
+    ****/
 // Wait  
     delay(800);
     sensors.requestTemperatures(); // Send the command to get initial temperatures
@@ -554,7 +563,7 @@ static void sendInfo(int i) {
 
 
 static void OK200Page() {
-  bfill = tcpOffset(buf);  
+  bfill = ether.tcpOffset();
   bfill.emit_p(PSTR(
   "HTTP/1.0 200 OK\r\n"
     "Content-Type: text/html\r\n"
@@ -566,11 +575,11 @@ static void OK200Page() {
 	"<A HREF=\"/\">Home</A><P>"
 	"</html>"
 	));
- es.ES_www_server_reply(buf,bfill.position()); // send web page data
+ ether.httpServerReply(bfill.position()); // send web page data
 
 }
 static void failedPage() {
-  bfill = tcpOffset(buf);  
+  bfill = ether.tcpOffset();
   bfill.emit_p(PSTR(
   "HTTP/1.0 200 OK\r\n"
     "Content-Type: text/html\r\n"
@@ -582,29 +591,29 @@ static void failedPage() {
 	"<A HREF=\"/\">Home</A><P>"
 	"</body></html>"
 	));
- es.ES_www_server_reply(buf,bfill.position()); // send web page data
+ ether.httpServerReply(bfill.position()); // send web page data
 
 }
 
 static void UA401Page() {
-  bfill = tcpOffset(buf);  
+  bfill = ether.tcpOffset();
   bfill.emit_p(PSTR(
   "HTTP/1.0 401 Not Auth\r\n"
 	));
- es.ES_www_server_reply(buf,bfill.position()); // send web page data
+ ether.httpServerReply(bfill.position()); // send web page data
 }
 static void NF404Page() {
-  bfill = tcpOffset(buf);  
+  bfill = ether.tcpOffset();
   bfill.emit_p(PSTR(
   "HTTP/1.0 404 Not Found\r\n"
 	));
- es.ES_www_server_reply(buf,bfill.position()); // send web page data
+ ether.httpServerReply(bfill.position()); // send web page data
 
 }
 
 static void configPage() {
 //Serial.println("CONFIG");
-  bfill = tcpOffset(buf);  
+  bfill = ether.tcpOffset();
   bfill.emit_p(PSTR(
   "<html><head><title>xAP Configuration</title></head>"
   "<body style=\"background:#A9F5F2\">"
@@ -626,13 +635,13 @@ static void configPage() {
   "<input type=\"submit\" value=\"Go\"/>"
   "</form><hr/></body></html>"
 	));
- es.ES_www_server_reply(buf,bfill.position()); // send web page data
+ ether.httpServerReply(bfill.position()); // send web page data
 
 }
 
 static void configSubs() {
 //Serial.println("SUBS");
-  bfill = tcpOffset(buf);  
+  bfill = ether.tcpOffset();
   bfill.emit_p(PSTR(
   "<html><head><title>xAP SubAddress</title></head>"
   "<body style=\"background:#A9F5F2\">"
@@ -649,19 +658,20 @@ static void configSubs() {
   "<input type=\"submit\" value=\"Go\"/>"
   "</form><hr/></body></html>"
 	));
-es.ES_www_server_reply(buf,bfill.position()); // send web page data
+ ether.httpServerReply(bfill.position()); // send web page data
+
 }
 
 // Mini logo as bmp file
 static void weblogo() {
   // send the mini logo
-  bfill = tcpOffset(buf);  
+  bfill = ether.tcpOffset();
   bfill.emit_p(PSTR(
   "HTTP/1.0 200 OK\r\n"
 	"Content-Type: image/bmp\r\n"
 	"Content-Length: $D\r\n\r\n"),sizeof(xaplogo));
-	memcpy_P(buf+0x36+bfill.position(), xaplogo, sizeof(xaplogo)); //length of the header data and 662 the bmp
-es.ES_www_server_reply(buf,(bfill.position()+sizeof(xaplogo))); // send web page data
+	memcpy_P(Ethernet::buffer+0x36+bfill.position(), xaplogo, sizeof(xaplogo)); //length of the header data and 662 the bmp
+ ether.httpServerReply((bfill.position()+sizeof(xaplogo))); // send web page data
 }
 static void homePage() {
 #ifdef USE_FRAM
@@ -669,7 +679,7 @@ _sensor sensor_temp;
 readSensorfromFRAM(&sensor_temp, 0);
 #endif
   // Web server only reports the 1st sensor
-  bfill = tcpOffset(buf);  
+  bfill = ether.tcpOffset();
 #ifdef XAP_VERSION_1.3
   bfill.emit_p(PSTR(
   "HTTP/1.0 200 OK\r\n"
@@ -729,14 +739,14 @@ readSensorfromFRAM(&sensor_temp, 0);
    dtostrf(sensor[0].temp,3,1,tempS)); 
 #endif	
 #endif
- es.ES_www_server_reply(buf,bfill.position()); // send web page data
+ ether.httpServerReply(bfill.position()); // send web page data
 }
 
 #ifdef DEBUG_THIS
 // Since we've got no serial port permanently connected to debug
 // Have a page which displays a debug message
 static void debugPage() {
-  bfill = tcpOffset(buf);  
+  bfill = ether.tcpOffset();
   bfill.emit_p(PSTR(
   "HTTP/1.0 200 OK\r\n"
     "Content-Type: text/html\r\n"
@@ -747,7 +757,7 @@ static void debugPage() {
 	"<A HREF=\"/\">Home</A><P>"
 	"</body></html>"
 	), DEBUG_THIS_MESSAGE);
- es.ES_www_server_reply(buf,bfill.position()); // send web page data
+ ether.httpServerReply(bfill.position()); // send web page data
 }
 #endif
 
@@ -795,7 +805,7 @@ byte c=0;
   }
 
   
-  bfill = udpOffset(buf);    
+  bfill = ether.udpOffset();
   bfill.emit_p(PSTR("xap-header\n"
     "{\n"
 #ifdef XAP_VERSION_1.3
@@ -821,7 +831,7 @@ byte c=0;
 #else
     "}"), UID_NETWORK, vendor, node_str, clazz, xAPSource, node_str, "on", dtostrf(sensor_temp->temp,3,1,tempS));
 #endif
-    es.ES_send_udp_broadcast(buf, bfill.position(), XAP_PORT, XAP_PORT);    
+    ether.sendUdpBroadcast((char *)ether.udpOffset(), bfill.position(), XAP_PORT, XAP_PORT);    
 //	Serial.println(sensor_temp->xAP_name);
 }
 /***************************************************************
@@ -886,8 +896,10 @@ void loop () {
   word len, pos;
   while(1){
 #ifdef USE_DHCP
-			if (semaphore & RENEWDHCP)
+			if ((semaphore & RENEWDHCP) | (ether.dhcpExpired()))
 			{
+			
+/**************
 				if( es.allocateIPAddress(buf, BUFFER_SIZE, mymac, 80, myip, mynetmask, gwip, dhcpsvrip, dnsip ) > 0 ) {
 					// Display the results:
 					Serial.print( F("Updated IP: " ));
@@ -896,12 +908,27 @@ void loop () {
 				} else {
 					Serial.println(F("ERR:DHCP"));
 				}	
+****************/
+				if (!ether.dhcpSetup()) {
+					Serial.println(F("ERR:DHCP"));
+				} else {
+					Serial.print( F("My IP: " ));
+					printIP( myip );
+					Serial.println(); 
+					renewDHCPcount = HRS24;
+					uptimeDays++;
+					semaphore &= ~RENEWDHCP; // reset flag
+				}
+			}
+#else
+			if (semaphore & RENEWDHCP)
+			{
 				renewDHCPcount = HRS24;
 				semaphore &= ~RENEWDHCP; // reset flag
 				uptimeDays++;
 			}
 #endif 
-		memset(buf, 0x00, sizeof(buf)); // clear it
+//		memset(buf, 0x00, sizeof(buf)); // clear it
 		
 		
 		if (semaphore & SENDBSCINFO) {
@@ -909,10 +936,9 @@ void loop () {
 			sendInfo();
 			semaphore &= ~SENDBSCINFO;
 		}
-		len = es.ES_enc28j60PacketReceive(sizeof(buf) ,buf);
-
+		len = ether.packetReceive();
 		// ENC28J60 loop runner: handle ping and wait for a tcp packet
-		pos = es.ES_packetloop_icmp_tcp(buf, len);  
+		pos = ether.packetLoop(len);
 		if(pos) {  // Check if valid www data is received.
 			switch(pageType(pos))
 			{
@@ -989,13 +1015,13 @@ void makeXapDefaults(void){
 byte pageType(word dat_p){
 char *s;
 int nodeval;
-//Serial.println((char *)&buf[dat_p]);
-    if (strncmp("GET ",(char *)&(buf[dat_p]),4)!=0){
+//Serial.println((char *)&Ethernet::buffer[dat_p]);
+    if (strncmp("GET ",(char *)&(Ethernet::buffer[dat_p]),4)!=0){
       // head, post and other methods:
 	  // check for return values and update FRAM
 				// locate the body section we're looking for \r\n\r\n
-				char * locater = strstr((char *)&buf[dat_p], "\r\n\r\n"); // search for the body section
-				if (locater != 0 && (strncmp("/c ",(char *)&(buf[dat_p+5]),3)==0)){ // config
+				char * locater = strstr((char *)&Ethernet::buffer[dat_p], "\r\n\r\n"); // search for the body section
+				if (locater != 0 && (strncmp("/c ",(char *)&(Ethernet::buffer[dat_p+5]),3)==0)){ // config
 //					Serial.println(locater+4); //show the body
 					// we have two inputs - Instance and Vendor UID
 					if(strncmp("source=",locater+4,7)==0){
@@ -1025,7 +1051,7 @@ int nodeval;
 						}
 						//add more here in sequence corresponding to the FORM POST
 					}
-				if (locater != 0 && (strncmp("/s ",(char *)&(buf[dat_p+5]),3)==0)){ // config subs
+				if (locater != 0 && (strncmp("/s ",(char *)&(Ethernet::buffer[dat_p+5]),3)==0)){ // config subs
 //						Serial.println(F("Subs"));
 //					Serial.println(locater+4); //show the body
 					if(strncmp("node=",locater+4,5)==0){
@@ -1070,19 +1096,19 @@ int nodeval;
 	  return 2;
 	}
 	else { // GET
-				if (strncmp("/ ",(char *)&(buf[dat_p+4]),2)==0){
+				if (strncmp("/ ",(char *)&(Ethernet::buffer[dat_p+4]),2)==0){
 //				Serial.println("0");
 				return 0;
 			}
-				if (strncmp("/s ",(char *)&(buf[dat_p+4]),2)==0){
+				if (strncmp("/s ",(char *)&(Ethernet::buffer[dat_p+4]),2)==0){
 //				Serial.println("5");
 				return 5;
 			}
-				if (strncmp("/xap ",(char *)&(buf[dat_p+4]),4)==0){ //logo
+				if (strncmp("/xap ",(char *)&(Ethernet::buffer[dat_p+4]),4)==0){ //logo
 //				Serial.println("6");
 				return 6;
 			}
-				if (strncmp("/debug",(char *)&(buf[dat_p+4]),6)==0){ // debug
+				if (strncmp("/debug",(char *)&(Ethernet::buffer[dat_p+4]),6)==0){ // debug
 //				Serial.println("7");
 				return 7;
 			}

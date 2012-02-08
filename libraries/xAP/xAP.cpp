@@ -161,13 +161,15 @@ int XapClass::parseMsg(byte *msg, int size) {
      }
      return xapMsgPairs;
 }
-/**************************
+/*
  Reconstruct an XAP packet from the parsed components
    and dump it to the serial port.  Useful for debugging.
 
    
    DISABLED AS DMX USES SERIAL PORT
+****/
 
+#ifndef IS_DMX
 
 void XapClass::dumpParsedMsg() {
   char *currentSection = NULL;
@@ -186,7 +188,8 @@ void XapClass::dumpParsedMsg() {
   }
   Serial.println("}");
 }
-***********************************************************/
+#endif
+
 bool XapClass::partialMatchSource(char *source, char *target)
 {
 // This looks to see if the target up to the : matches with our source address
