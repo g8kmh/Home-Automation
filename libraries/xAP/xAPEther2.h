@@ -47,7 +47,7 @@ class XapEther2 : public XapClass {
   char *getSOURCE(void);
   void process(word len, void (*callback)());
   void sendHeartbeat(void);
-
+  void sendHeartbeat(int freeram);
  private:
  byte *xapbuf;
  word xapbuflen;

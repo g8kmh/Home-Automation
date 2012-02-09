@@ -30,22 +30,27 @@
   
   
 */
+// CHANGE THE DEBUG FOR YOUR REQUIREMENTS
 
-
-#define DEBUG_THIS
+//#define DEBUG_THIS
 
 #ifdef DEBUG_THIS
-	#define BSCTEMP_VERSION "0.950D"
+	#define BSCTEMP_VERSION "0.951D"
 #else
-	#define BSCTEMP_VERSION "0.950"
+	#define BSCTEMP_VERSION "0.951"
 #endif
+// TURN THIS OFF FOR FIXED IP AND MAKE SURE YOU UPDATE ALL THE IP DETAILS (AND MAC IF NOT NANODE)
 #define USE_DHCP
+// TURN THIS OFF IF YOU DO NOT HAVE AN EXTERNAL SRAM OR FRAM (23K256)
 #define USE_FRAM
+
 #ifdef DEBUG_THIS
 	#define HRS24 60
 #else
 	#define HRS24 1440
 #endif
+
+// TURN THIS OFF FOR ARDUINO (NOT TESTED!)
 #define NANODE
 
 #include <EtherCard.h>
@@ -62,6 +67,8 @@
 #include <SpiRAM.h>
 #endif
 //#include <avr/pgmspace.h>
+
+int freeram;
 
 /**********************************************************
 			xAP LOGO
@@ -377,6 +384,8 @@ while(1);
 	
 #endif  // FRAM
 
+
+
 /******************************************************************************
 One Wire Init Code
 ******************************************************************************/
@@ -423,9 +432,6 @@ Configure xap object
 
 	xap.setUID(base_UID);
 	xap.setUPTIME(&uptimeDays);
-	/****
-    xap.setBuffer(Ethernet::buffer, sizeof Ethernet::buffer);
-    ****/
 // Wait  
     delay(800);
     sensors.requestTemperatures(); // Send the command to get initial temperatures
@@ -433,11 +439,13 @@ Configure xap object
 #ifdef USE_FRAM
     for(byte i=0;i<MAXSENSORS; i++) {
 	  updateTemperature(&sensor, i); // we'll get the right one from the FRAM/EEPROM memory
+	  }
 #else
     for(byte i=0;i<numberOfDevices; i++) {
       updateTemperature(&sensor[i], i);
-#endif
 	  }
+#endif
+	  
 
   sendInfo();
 /*******************************************************
@@ -480,7 +488,9 @@ Configure xap object
 #endif
 
 }
-/* END OF SETUP
+
+
+// END OF SETUP
 
 
 /*******************************************************
@@ -496,9 +506,11 @@ ISR(TIMER2_OVF_vect) {
   }
   if (tmx >= (XAP_HEARTBEAT-1000)/10) // every minute 'ish (60000 shows some creep over days)
   { 
-	xap.sendHeartbeat();
 #ifdef DEBUG_THIS
-			sprintf(DEBUG_THIS_MESSAGE, "%s %d", "HB", freeRam());
+		sprintf(DEBUG_THIS_MESSAGE, "%s %d", "HB", freeRam());
+		xap.sendHeartbeat(freeRam());
+#else
+		xap.sendHeartbeat();
 #endif
 
 //	Serial.println(freeRam());
@@ -510,7 +522,6 @@ ISR(TIMER2_OVF_vect) {
 		}
  // add any other tasks here  
 }  
-  
 
 /*******************************************************
  Output an ip address from buffer
@@ -1373,13 +1384,6 @@ byte counter = 0;
 
 
 #endif
-#ifdef DEBUG_THIS
-int freeRam () {
-  extern int __heap_start, *__brkval; 
-  int v; 
-  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
-}
-#endif
 
 
 bool isnumeric(char *in_string){
@@ -1393,9 +1397,10 @@ char *str = in_string;
 return true;
 }
 
-uint8_t *udpOffset(uint8_t *buf) 
-		{ return buf + 0x2a; } // UDP_DATA_P
-
-uint8_t* tcpOffset(uint8_t* buf)
-		{ return buf + 0x36; }
-
+#ifdef DEBUG_THIS
+int freeRam () {
+  extern int __heap_start, *__brkval; 
+  int v; 
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
+}
+#endif

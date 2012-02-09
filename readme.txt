@@ -1,6 +1,9 @@
+Release 0.951 changelist
+Added freeram to xAP heartbeat message (only if DEBUG_THIS is #defined)
+-----------------------------------------------------------
 Release 0.950 changelist
 Conversion to Ethercard
-----------------------------------------------------------
+-----------------------------------------------------------
 README.TXT 0.947
 First Github release
 
