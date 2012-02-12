@@ -1,3 +1,8 @@
+Release 0.952 changelist
+Fixed bug - owaddress appearing in BSC message when no SRAM/FRAM. Not possible as owaddress is stored in SRAM/FRAM only.
+Tidy up.
+Changed number of sensors from 4 to 6 for non SRAM/FRAM build (tested to 5).
+-----------------------------------------------------------
 Release 0.951 changelist
 Added freeram to xAP heartbeat message (only if DEBUG_THIS is #defined)
 -----------------------------------------------------------

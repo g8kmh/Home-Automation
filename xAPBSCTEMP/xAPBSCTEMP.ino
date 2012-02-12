@@ -32,17 +32,17 @@
 */
 // CHANGE THE DEBUG FOR YOUR REQUIREMENTS
 
-//#define DEBUG_THIS
+//	#define DEBUG_THIS
 
 #ifdef DEBUG_THIS
-	#define BSCTEMP_VERSION "0.951D"
+	#define BSCTEMP_VERSION "0.952D"
 #else
-	#define BSCTEMP_VERSION "0.951"
+	#define BSCTEMP_VERSION "0.952"
 #endif
 // TURN THIS OFF FOR FIXED IP AND MAKE SURE YOU UPDATE ALL THE IP DETAILS (AND MAC IF NOT NANODE)
 #define USE_DHCP
 // TURN THIS OFF IF YOU DO NOT HAVE AN EXTERNAL SRAM OR FRAM (23K256)
-#define USE_FRAM
+//#define USE_FRAM
 
 #ifdef DEBUG_THIS
 	#define HRS24 60
@@ -124,19 +124,11 @@ static uint8_t mymac[6] = { 0,0,0,0,0,0 };
 #else
 static uint8_t mymac[6] = { 0x54,0x55,0x58,0x12,0x34,0x56 }; // CHANGE THIS FOR YOUR NETWORK MAC ADDRESS - MUST BE UNIQUE PER DEVICE
 #endif
+
+// Your IP address if not using DHCP
 static uint8_t myip[4] = { 192,168,0,55 };
-static uint8_t mynetmask[4] = { 255,255,255,0 };
-
-// IP address of the host being queried to contact (IP of the first portion of the URL):
-//static uint8_t websrvip[4] = { 0, 0, 0, 0 };
-
-// Default gateway. The ip address of your DSL router. It can be set to the same as
-// websrvip the case where there is no default GW to access the 
-// web server (=web server is on the same lan as this host) 
+// Default gateway. The ip address of your DSL router.
 static uint8_t gwip[4] = { 192,168,0,1};
-
-static uint8_t dnsip[4] = { 0,0,0,0 };
-static uint8_t dhcpsvrip[4] = { 0,0,0,0 };
 // Semaphore
 byte semaphore = 0;
 enum semaphores { RENEWDHCP =0x01, SENDBSCINFO = 0x02, UPDATETEMPERATURES = 0x04};
@@ -200,7 +192,7 @@ LSB (°C) 				0.5 	0.25 	0.125 	0.0625
 #ifdef USE_FRAM
 #define MAXSENSORS 16
 #else
-#define MAXSENSORS 4
+#define MAXSENSORS 6
 #endif
 
 
@@ -836,8 +828,8 @@ byte c=0;
     "{\n"
     "state=$S\n"
     "text=$SC\n"
-	"owaddress=$S\n"
 #ifdef USE_FRAM
+	"owaddress=$S\n"
     "}"), UID_NETWORK, vendor, node_str, clazz, xAPSource, sensor_temp->xAP_name, (sensor_temp->temp > sensor_temp->setpoint ? "on" : "off"), dtostrf(sensor_temp->temp,3,1,tempS), addrstr);
 #else
     "}"), UID_NETWORK, vendor, node_str, clazz, xAPSource, node_str, "on", dtostrf(sensor_temp->temp,3,1,tempS));
@@ -909,17 +901,6 @@ void loop () {
 #ifdef USE_DHCP
 			if ((semaphore & RENEWDHCP) | (ether.dhcpExpired()))
 			{
-			
-/**************
-				if( es.allocateIPAddress(buf, BUFFER_SIZE, mymac, 80, myip, mynetmask, gwip, dhcpsvrip, dnsip ) > 0 ) {
-					// Display the results:
-					Serial.print( F("Updated IP: " ));
-					printIP( myip );
-					Serial.println(); 
-				} else {
-					Serial.println(F("ERR:DHCP"));
-				}	
-****************/
 				if (!ether.dhcpSetup()) {
 					Serial.println(F("ERR:DHCP"));
 				} else {
